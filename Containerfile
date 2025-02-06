@@ -2,7 +2,7 @@
 FROM quay.io/fedora/fedora:40 AS build-container
 
 RUN dnf install -y \
-    git \    
+    git \
     tss2-devel \
     protobuf-compiler \
     tpm2-tss-devel \
@@ -10,6 +10,10 @@ RUN dnf install -y \
     cmake \
     clang
 
+# Install tdx deps from custom copr for now
+RUN dnf install -y 'dnf-command(copr)' && \
+    dnf copr enable -y berrange/sgx-ng && \
+    dnf install -y tdx-attest-devel sgx-devel
 
 ## Install rust
 ARG COCO_RUST_VERSION=stable
@@ -26,9 +30,9 @@ RUN mkdir /tools
 ARG GUEST_COMPONENTS_REF=v0.11.0
 ENV GUEST_COMPONENTS_REF=${GUEST_COMPONENTS_REF}
 RUN git clone --single-branch --branch ${GUEST_COMPONENTS_REF} https://github.com/confidential-containers/guest-components.git
-# No TDX as tdx deps are not in Fedora
+# cargo build -p kbs_protocol --bin trustee-attester --locked --release --no-default-features --features background_check,passport,openssl,az-snp-vtpm-attester,az-tdx-vtpm-attester,snp-attester,bi
 RUN cd /guest-components/attestation-agent/kbs_protocol/ && \
-    cargo build -p kbs_protocol --bin trustee-attester --locked --release --no-default-features --features background_check,passport,openssl,az-snp-vtpm-attester,az-tdx-vtpm-attester,snp-attester,bin
+    cargo build -p kbs_protocol --bin trustee-attester --locked --release --no-default-features --features background_check,passport,openssl,all-attesters,bin
 # Copy trustee-attester
 RUN cp /guest-components/target/release/trustee-attester /tools/trustee-attester
 
@@ -37,7 +41,6 @@ RUN cd /guest-components/confidential-data-hub/hub && \
     cargo build --release --no-default-features --features "bin,ttrpc,kbs" --bin ttrpc-cdh
 # Copy oneshot CDH
 RUN cp /guest-components/target/release/ttrpc-cdh /tools/ttrpc-cdh
-
 
 # sealed secret client
 RUN cd /guest-components/confidential-data-hub/hub && \
@@ -51,9 +54,9 @@ ARG TRUSTEE_REF=v0.11.0
 ENV TRUSTEE_REF=${TRUSTEE_REF}
 
 RUN git clone --single-branch --branch ${TRUSTEE_REF} https://github.com/confidential-containers/trustee.git
-#  make -C ../../kbs cli CLI_FEATURES="kbs_protocol/background_check","kbs_protocol/passport","kbs_protocol/openssl","kbs_protocol/az-snp-vtpm-attester","kbs_protocol/az-tdx-vtpm-attester","kbs_protocol/snp-attester"
+# cargo build -p kbs-client --locked --release --no-default-features --features "kbs_protocol/background_check,kbs_protocol/passport,kbs_protocol/openssl,kbs_protocol/az-snp-vtpm-attester,kbs_protocol/az-tdx-vtpm-attester,kbs_protocol/snp-attester,kbs_protocol/tdx-attester"
 RUN cd /trustee/tools/kbs-client/ && \
-    cargo build -p kbs-client --locked --release --no-default-features --features "kbs_protocol/background_check,kbs_protocol/passport,kbs_protocol/openssl,kbs_protocol/az-snp-vtpm-attester,kbs_protocol/az-tdx-vtpm-attester,kbs_protocol/snp-attester"
+    cargo build -p kbs-client --locked --release --no-default-features --features "sample_only,all-attesters"
 # Copy kbs-client
 RUN cp /trustee/target/release/kbs-client /tools/kbs-client
 
@@ -75,6 +78,6 @@ RUN cp /kata-containers/src/tools/genpolicy/target/release/genpolicy /tools/genp
 #FROM registry.access.redhat.com/ubi9/ubi:latest
 FROM quay.io/fedora/fedora:40 as tools-container
 
-RUN dnf install -y tpm2-tss openssl-libs libgcc zlib-ng-compat 
+RUN dnf install -y tpm2-tss openssl-libs libgcc zlib-ng-compat
 COPY --from=build-container /tools /tools
 ENV PATH="/tools:${PATH}"
