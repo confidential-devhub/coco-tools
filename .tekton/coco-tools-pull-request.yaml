@@ -23,7 +23,7 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/bpradipt-tenant/coco-tools:on-pr-{{revision}}
+    value: quay.io/confidential-devhub/coco-tools:on-pr-{{revision}}
   - name: image-expires-after
     value: 5d
   - name: dockerfile

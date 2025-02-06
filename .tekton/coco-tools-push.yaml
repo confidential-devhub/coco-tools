@@ -22,7 +22,7 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/bpradipt-tenant/coco-tools:{{revision}}
+    value: quay.io/confidential-devhub/coco-tools:{{revision}}
   - name: dockerfile
     value: Containerfile
   pipelineSpec:
