@@ -1,5 +1,5 @@
 #FROM registry.access.redhat.com/ubi9/ubi:latest
-FROM quay.io/fedora/fedora:40 AS build-container
+FROM quay.io/fedora/fedora:43 AS build-container
 
 RUN dnf install -y \
     git \
@@ -76,7 +76,7 @@ RUN cd /kata-containers/src/tools/genpolicy && \
 RUN cp /kata-containers/src/tools/genpolicy/target/release/genpolicy /tools/genpolicy
 
 #FROM registry.access.redhat.com/ubi9/ubi:latest
-FROM quay.io/fedora/fedora:40 as tools-container
+FROM quay.io/fedora/fedora:43 as tools-container
 
 RUN dnf install -y tpm2-tss openssl-libs libgcc zlib-ng-compat
 COPY --from=build-container /tools /tools
