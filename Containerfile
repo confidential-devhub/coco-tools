@@ -79,5 +79,11 @@ RUN cp /kata-containers/src/tools/genpolicy/target/release/genpolicy /tools/genp
 FROM quay.io/fedora/fedora:40 as tools-container
 
 RUN dnf install -y tpm2-tss openssl-libs libgcc zlib-ng-compat
+
+# Install tdx deps from custom copr for now
+RUN dnf install -y 'dnf-command(copr)' && \
+    dnf copr enable -y berrange/sgx-ng && \
+    dnf install -y tdx-attest-libs
+
 COPY --from=build-container /tools /tools
 ENV PATH="/tools:${PATH}"
