@@ -1,6 +1,8 @@
 #FROM registry.access.redhat.com/ubi9/ubi:latest
 FROM quay.io/fedora/fedora:43 AS build-container
 
+LABEL konflux.additional-tags="latest"
+
 RUN dnf install -y \
     git \
     tss2-devel \
