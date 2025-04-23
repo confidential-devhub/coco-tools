@@ -27,8 +27,18 @@ ENV PATH=$PATH:/root/.cargo/bin
 RUN mkdir /tools
 
 # Build different binaries
-# Build trustee-attester
 
+# Build snpguest
+ARG SNPGUEST_REF=v0.8.3
+ENV SNPGUEST_REF=${SNPGUEST_REF}
+
+RUN git clone --single-branch --branch ${SNPGUEST_REF} https://github.com/virtee/snpguest.git
+RUN cd /snpguest/ && \
+    cargo build -r
+# Copy snpguest
+RUN cp /snpguest/target/release/snpguest /tools/snpguest
+
+# Build trustee-attester
 ARG GUEST_COMPONENTS_REF=v0.11.0
 ENV GUEST_COMPONENTS_REF=${GUEST_COMPONENTS_REF}
 RUN git clone --single-branch --branch ${GUEST_COMPONENTS_REF} https://github.com/confidential-containers/guest-components.git
