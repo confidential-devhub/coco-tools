@@ -64,7 +64,7 @@ RUN cp /guest-components/target/release/ttrpc-cdh /tools/ttrpc-cdh
 
 # sealed secret client
 RUN cd /guest-components/confidential-data-hub/hub && \
-    cargo build --release -p confidential-data-hub --bin secret
+    cargo build --release --no-default-features --features "bin,cli" --bin secret
 # Copy sealed secret client
 RUN cp /guest-components/target/release/secret /tools/secret
 
