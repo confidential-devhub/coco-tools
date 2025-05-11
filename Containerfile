@@ -1,7 +1,5 @@
 FROM quay.io/fedora/fedora:43 AS build-container
 
-LABEL konflux.additional-tags="latest 0.2.0"
-
 RUN dnf install -y \
     git \
     tss2-devel \
@@ -97,8 +95,9 @@ RUN cd /kata-containers/src/tools/genpolicy && \
 # Copy genpolicy
 RUN cp /kata-containers/src/tools/genpolicy/target/release/genpolicy /tools/genpolicy
 
-#FROM registry.access.redhat.com/ubi9/ubi:latest
 FROM quay.io/fedora/fedora:43 as tools-container
+
+LABEL konflux.additional-tags="latest 0.2.0"
 
 RUN dnf install -y tpm2-tss openssl-libs libgcc zlib-ng-compat
 
