@@ -1,7 +1,6 @@
-#FROM registry.access.redhat.com/ubi9/ubi:latest
 FROM quay.io/fedora/fedora:43 AS build-container
 
-LABEL konflux.additional-tags="latest 0.1.0"
+LABEL konflux.additional-tags="latest 0.2.0"
 
 RUN dnf install -y \
     git \
@@ -18,7 +17,7 @@ RUN dnf install -y 'dnf-command(copr)' && \
     dnf install -y tdx-attest-devel sgx-devel
 
 ## Install rust
-ARG COCO_RUST_VERSION=stable
+ARG COCO_RUST_VERSION=1.80.0
 ENV COCO_RUST_VERSION=${COCO_RUST_VERSION}
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain ${COCO_RUST_VERSION}
 ENV PATH=$PATH:/root/.cargo/bin
@@ -39,7 +38,7 @@ RUN cd /snpguest/ && \
 RUN cp /snpguest/target/release/snpguest /tools/snpguest
 
 # Build trustee-attester
-ARG GUEST_COMPONENTS_REF=v0.11.0
+ARG GUEST_COMPONENTS_REF=v0.12.0
 ENV GUEST_COMPONENTS_REF=${GUEST_COMPONENTS_REF}
 RUN git clone --single-branch --branch ${GUEST_COMPONENTS_REF} https://github.com/confidential-containers/guest-components.git
 # cargo build -p kbs_protocol --bin trustee-attester --locked --release --no-default-features --features background_check,passport,openssl,az-snp-vtpm-attester,az-tdx-vtpm-attester,snp-attester,bi
@@ -62,7 +61,7 @@ RUN cp /guest-components/target/release/secret /tools/secret
 
 
 # Build kbs-client
-ARG TRUSTEE_REF=v0.11.0
+ARG TRUSTEE_REF=v0.12.0
 ENV TRUSTEE_REF=${TRUSTEE_REF}
 
 RUN git clone --single-branch --branch ${TRUSTEE_REF} https://github.com/confidential-containers/trustee.git
@@ -74,9 +73,9 @@ RUN cp /trustee/target/release/kbs-client /tools/kbs-client
 
 
 # genpolicy
-ARG KATA_REF=3.13.0
+ARG KATA_REF=3.15.0
 ENV KATA_REF=${KATA_REF}
-ARG KATA_RUST_VERSION=1.75.0
+ARG KATA_RUST_VERSION=1.80.0
 ENV KATA_RUST_VERSION=${KATA_RUST_VERSION}
 RUN rustup default ${KATA_RUST_VERSION}
 RUN git clone --single-branch --branch ${KATA_REF} https://github.com/kata-containers/kata-containers.git
