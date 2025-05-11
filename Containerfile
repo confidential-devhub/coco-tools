@@ -37,6 +37,17 @@ RUN cd /snpguest/ && \
 # Copy snpguest
 RUN cp /snpguest/target/release/snpguest /tools/snpguest
 
+# Build snphost
+ARG SNPHOST_REF=main
+ENV SNPHOST_REF=${SNPHOST_REF}
+
+RUN git clone --single-branch --branch ${SNPHOST_REF} https://github.com/virtee/snphost.git
+RUN cd /snphost/ && \
+    cargo build -r
+# Copy snphost
+RUN cp /snphost/target/release/snphost /tools/snphost
+
+
 # Build trustee-attester
 ARG GUEST_COMPONENTS_REF=v0.12.0
 ENV GUEST_COMPONENTS_REF=${GUEST_COMPONENTS_REF}
