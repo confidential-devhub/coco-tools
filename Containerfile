@@ -47,7 +47,7 @@ RUN cp /snphost/target/release/snphost /tools/snphost
 
 
 # Build trustee-attester
-ARG GUEST_COMPONENTS_REF=v0.12.0
+ARG GUEST_COMPONENTS_REF=v0.13.0
 ENV GUEST_COMPONENTS_REF=${GUEST_COMPONENTS_REF}
 RUN git clone --single-branch --branch ${GUEST_COMPONENTS_REF} https://github.com/confidential-containers/guest-components.git
 # cargo build -p kbs_protocol --bin trustee-attester --locked --release --no-default-features --features background_check,passport,openssl,az-snp-vtpm-attester,az-tdx-vtpm-attester,snp-attester,bi
@@ -70,7 +70,7 @@ RUN cp /guest-components/target/release/secret /tools/secret
 
 
 # Build kbs-client
-ARG TRUSTEE_REF=v0.12.0
+ARG TRUSTEE_REF=v0.13.0
 ENV TRUSTEE_REF=${TRUSTEE_REF}
 
 RUN git clone --single-branch --branch ${TRUSTEE_REF} https://github.com/confidential-containers/trustee.git
@@ -82,7 +82,7 @@ RUN cp /trustee/target/release/kbs-client /tools/kbs-client
 
 
 # genpolicy
-ARG KATA_REF=3.15.0
+ARG KATA_REF=3.17.0
 ENV KATA_REF=${KATA_REF}
 ARG KATA_RUST_VERSION=1.80.0
 ENV KATA_RUST_VERSION=${KATA_RUST_VERSION}
@@ -97,7 +97,7 @@ RUN cp /kata-containers/src/tools/genpolicy/target/release/genpolicy /tools/genp
 
 FROM quay.io/fedora/fedora:43 as tools-container
 
-LABEL konflux.additional-tags="latest 0.2.0"
+LABEL konflux.additional-tags="latest 0.3.0"
 
 RUN dnf install -y tpm2-tss openssl-libs libgcc zlib-ng-compat
 
