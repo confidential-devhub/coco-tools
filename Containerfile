@@ -1,4 +1,4 @@
-FROM quay.io/fedora/fedora:43 AS build-container
+FROM quay.io/fedora/fedora:44 AS build-container
 
 RUN dnf install -y \
     git \
@@ -95,7 +95,7 @@ RUN cd /kata-containers/src/tools/genpolicy && \
 # Copy genpolicy
 RUN cp /kata-containers/src/tools/genpolicy/target/release/genpolicy /tools/genpolicy
 
-FROM quay.io/fedora/fedora:43 as tools-container
+FROM quay.io/fedora/fedora:44 as tools-container
 
 LABEL konflux.additional-tags="latest 0.3.0"
 
