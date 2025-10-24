@@ -15,7 +15,7 @@ RUN dnf install -y 'dnf-command(copr)' && \
     dnf install -y tdx-attest-devel sgx-devel
 
 ## Install rust
-ARG COCO_RUST_VERSION=1.80.0
+ARG COCO_RUST_VERSION=1.85.1
 ENV COCO_RUST_VERSION=${COCO_RUST_VERSION}
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain ${COCO_RUST_VERSION}
 ENV PATH=$PATH:/root/.cargo/bin
@@ -26,7 +26,7 @@ RUN mkdir /tools
 # Build different binaries
 
 # Build snpguest
-ARG SNPGUEST_REF=v0.8.3
+ARG SNPGUEST_REF=v0.9.2
 ENV SNPGUEST_REF=${SNPGUEST_REF}
 
 RUN git clone --single-branch --branch ${SNPGUEST_REF} https://github.com/virtee/snpguest.git
@@ -47,7 +47,7 @@ RUN cp /snphost/target/release/snphost /tools/snphost
 
 
 # Build trustee-attester
-ARG GUEST_COMPONENTS_REF=v0.13.0
+ARG GUEST_COMPONENTS_REF=v0.15.0
 ENV GUEST_COMPONENTS_REF=${GUEST_COMPONENTS_REF}
 RUN git clone --single-branch --branch ${GUEST_COMPONENTS_REF} https://github.com/confidential-containers/guest-components.git
 # cargo build -p kbs_protocol --bin trustee-attester --locked --release --no-default-features --features background_check,passport,openssl,az-snp-vtpm-attester,az-tdx-vtpm-attester,snp-attester,bi
@@ -70,7 +70,7 @@ RUN cp /guest-components/target/release/secret /tools/secret
 
 
 # Build kbs-client
-ARG TRUSTEE_REF=v0.13.0
+ARG TRUSTEE_REF=v0.15.0
 ENV TRUSTEE_REF=${TRUSTEE_REF}
 
 RUN git clone --single-branch --branch ${TRUSTEE_REF} https://github.com/confidential-containers/trustee.git
@@ -82,9 +82,9 @@ RUN cp /trustee/target/release/kbs-client /tools/kbs-client
 
 
 # genpolicy
-ARG KATA_REF=3.17.0
+ARG KATA_REF=3.21.0
 ENV KATA_REF=${KATA_REF}
-ARG KATA_RUST_VERSION=1.80.0
+ARG KATA_RUST_VERSION=1.85.1
 ENV KATA_RUST_VERSION=${KATA_RUST_VERSION}
 RUN rustup default ${KATA_RUST_VERSION}
 RUN git clone --single-branch --branch ${KATA_REF} https://github.com/kata-containers/kata-containers.git
@@ -97,7 +97,7 @@ RUN cp /kata-containers/src/tools/genpolicy/target/release/genpolicy /tools/genp
 
 FROM quay.io/fedora/fedora:44 as tools-container
 
-LABEL konflux.additional-tags="latest 0.3.0"
+LABEL konflux.additional-tags="latest 0.4.0"
 
 RUN dnf install -y tpm2-tss openssl-libs libgcc zlib-ng-compat
 
