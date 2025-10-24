@@ -25,6 +25,12 @@ RUN mkdir /tools
 
 # Build different binaries
 
+## Install rust
+ARG SNPGUEST_RUST_VERSION=1.86.0
+ENV SNPGUEST_RUST_VERSION=${SNPGUEST_RUST_VERSION}
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain ${SNPGUEST_RUST_VERSION}
+ENV PATH=$PATH:/root/.cargo/bin
+
 # Build snpguest
 ARG SNPGUEST_REF=v0.9.2
 ENV SNPGUEST_REF=${SNPGUEST_REF}
@@ -44,6 +50,12 @@ RUN cd /snphost/ && \
     cargo build -r
 # Copy snphost
 RUN cp /snphost/target/release/snphost /tools/snphost
+
+
+## Install rust
+ARG COCO_RUST_VERSION=1.85.1
+ENV COCO_RUST_VERSION=${COCO_RUST_VERSION}
+RUN rustup default ${COCO_RUST_VERSION}
 
 
 # Build trustee-attester
