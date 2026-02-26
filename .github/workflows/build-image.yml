@@ -38,14 +38,12 @@ jobs:
           - arch: amd64
             runner: ubuntu-24.04
             platform: linux/amd64
-          # To enable multi-arch builds, uncomment entries below and update
-          # the publish-manifest job to include the additional arch tags.
-          # - arch: arm64
-          #   runner: ubuntu-24.04-arm
-          #   platform: linux/arm64
-          # - arch: s390x
-          #   runner: ubuntu-24.04
-          #   platform: linux/s390x
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            platform: linux/arm64
+          - arch: s390x
+            runner: ubuntu-24.04
+            platform: linux/s390x
 
     steps:
       - name: Checkout
@@ -112,8 +110,8 @@ jobs:
           # When adding more architectures to the build matrix above,
           # append the corresponding arch tag here.
           SOURCE_IMAGES="${REGISTRY}/${IMAGE}:${SHA}-amd64"
-          # SOURCE_IMAGES="${SOURCE_IMAGES} ${REGISTRY}/${IMAGE}:${SHA}-arm64"
-          # SOURCE_IMAGES="${SOURCE_IMAGES} ${REGISTRY}/${IMAGE}:${SHA}-s390x"
+          SOURCE_IMAGES="${SOURCE_IMAGES} ${REGISTRY}/${IMAGE}:${SHA}-arm64"
+          SOURCE_IMAGES="${SOURCE_IMAGES} ${REGISTRY}/${IMAGE}:${SHA}-s390x"
 
           docker manifest create "${REGISTRY}/${IMAGE}:${SHA}" ${SOURCE_IMAGES}
           docker manifest push "${REGISTRY}/${IMAGE}:${SHA}"
@@ -125,8 +123,8 @@ jobs:
         run: |
           # Mirror the arch list from the commit SHA manifest step above.
           SOURCE_IMAGES="${REGISTRY}/${IMAGE}:latest-amd64"
-          # SOURCE_IMAGES="${SOURCE_IMAGES} ${REGISTRY}/${IMAGE}:latest-arm64"
-          # SOURCE_IMAGES="${SOURCE_IMAGES} ${REGISTRY}/${IMAGE}:latest-s390x"
+          SOURCE_IMAGES="${SOURCE_IMAGES} ${REGISTRY}/${IMAGE}:latest-arm64"
+          SOURCE_IMAGES="${SOURCE_IMAGES} ${REGISTRY}/${IMAGE}:latest-s390x"
 
           docker manifest create "${REGISTRY}/${IMAGE}:latest" ${SOURCE_IMAGES}
           docker manifest push "${REGISTRY}/${IMAGE}:latest"
