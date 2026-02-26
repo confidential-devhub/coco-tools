@@ -22,30 +22,10 @@ on:
       GHCR_TOKEN:
         required: false
 
-permissions:
-  contents: read
-  packages: write
-  actions: write
-
 jobs:
   build:
-    name: Build (${{ matrix.arch }})
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: amd64
-            runner: ubuntu-24.04
-            platform: linux/amd64
-          # To enable multi-arch builds, uncomment entries below and update
-          # the publish-manifest job to include the additional arch tags.
-          # - arch: arm64
-          #   runner: ubuntu-24.04-arm
-          #   platform: linux/arm64
-          # - arch: s390x
-          #   runner: ubuntu-24.04
-          #   platform: linux/s390x
+    name: Build image
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout
@@ -69,64 +49,18 @@ jobs:
           context: .
           file: Containerfile
           push: false
-          platforms: ${{ matrix.platform }}
-          tags: ${{ inputs.registry }}/${{ inputs.image_name }}:${{ github.sha }}-${{ matrix.arch }}
-          cache-from: type=gha,scope=${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: Build and push (arch-specific tags)
+      - name: Build and push
         if: ${{ inputs.push }}
         uses: docker/build-push-action@14487ce63c7a62a4a324b0bfb37086795e31c6c1  # v6.16.0
         with:
           context: .
           file: Containerfile
           push: true
-          platforms: ${{ matrix.platform }}
           tags: |
-            ${{ inputs.registry }}/${{ inputs.image_name }}:${{ github.sha }}-${{ matrix.arch }}
-            ${{ inputs.registry }}/${{ inputs.image_name }}:latest-${{ matrix.arch }}
-          cache-from: type=gha,scope=${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
-
-  publish-manifest:
-    name: Publish Multi-Arch Manifest
-    runs-on: ubuntu-24.04
-    needs: [build]
-    if: ${{ inputs.push }}
-
-    steps:
-      - name: Log in to GHCR
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772  # v3.4.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_TOKEN }}
-
-      - name: Create and push manifest — commit SHA tag
-        env:
-          REGISTRY: ${{ inputs.registry }}
-          IMAGE: ${{ inputs.image_name }}
-          SHA: ${{ github.sha }}
-        run: |
-          # List all arch-specific images to include in the manifest.
-          # When adding more architectures to the build matrix above,
-          # append the corresponding arch tag here.
-          SOURCE_IMAGES="${REGISTRY}/${IMAGE}:${SHA}-amd64"
-          # SOURCE_IMAGES="${SOURCE_IMAGES} ${REGISTRY}/${IMAGE}:${SHA}-arm64"
-          # SOURCE_IMAGES="${SOURCE_IMAGES} ${REGISTRY}/${IMAGE}:${SHA}-s390x"
-
-          docker manifest create "${REGISTRY}/${IMAGE}:${SHA}" ${SOURCE_IMAGES}
-          docker manifest push "${REGISTRY}/${IMAGE}:${SHA}"
-
-      - name: Create and push manifest — latest tag
-        env:
-          REGISTRY: ${{ inputs.registry }}
-          IMAGE: ${{ inputs.image_name }}
-        run: |
-          # Mirror the arch list from the commit SHA manifest step above.
-          SOURCE_IMAGES="${REGISTRY}/${IMAGE}:latest-amd64"
-          # SOURCE_IMAGES="${SOURCE_IMAGES} ${REGISTRY}/${IMAGE}:latest-arm64"
-          # SOURCE_IMAGES="${SOURCE_IMAGES} ${REGISTRY}/${IMAGE}:latest-s390x"
-
-          docker manifest create "${REGISTRY}/${IMAGE}:latest" ${SOURCE_IMAGES}
-          docker manifest push "${REGISTRY}/${IMAGE}:latest"
+            ${{ inputs.registry }}/${{ inputs.image_name }}:${{ github.sha }}
+            ${{ inputs.registry }}/${{ inputs.image_name }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
