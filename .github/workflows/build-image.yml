@@ -22,11 +22,6 @@ on:
       GHCR_TOKEN:
         required: false
 
-permissions:
-  contents: read
-  packages: write
-  actions: write
-
 jobs:
   build:
     name: Build (${{ matrix.arch }})
