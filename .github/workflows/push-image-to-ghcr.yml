@@ -10,6 +10,13 @@ permissions:
   packages: write
   actions: write
 
+# Only one run at a time per branch. If a new push arrives while a previous
+# run is still in progress, cancel the older run so the newest commit always
+# wins the "latest" tag.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-push:
     name: Build and push image
