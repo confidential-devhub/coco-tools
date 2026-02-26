@@ -7,12 +7,10 @@ RUN dnf install -y \
     tpm2-tss-devel \
     perl-core \
     cmake \
-    clang
+    clang \
+    tdx-attest-devel \
+    sgx-devel
 
-# Install tdx deps from custom copr for now
-RUN dnf install -y 'dnf-command(copr)' && \
-    dnf copr enable -y berrange/sgx-ng && \
-    dnf install -y tdx-attest-devel sgx-devel
 
 ## Install rust
 ARG COCO_RUST_VERSION=1.85.1
@@ -62,7 +60,6 @@ RUN rustup default ${COCO_RUST_VERSION}
 ARG GUEST_COMPONENTS_REF=v0.15.0
 ENV GUEST_COMPONENTS_REF=${GUEST_COMPONENTS_REF}
 RUN git clone --single-branch --branch ${GUEST_COMPONENTS_REF} https://github.com/confidential-containers/guest-components.git
-# cargo build -p kbs_protocol --bin trustee-attester --locked --release --no-default-features --features background_check,passport,openssl,az-snp-vtpm-attester,az-tdx-vtpm-attester,snp-attester,bi
 RUN cd /guest-components/attestation-agent/kbs_protocol/ && \
     cargo build -p kbs_protocol --bin trustee-attester --locked --release --no-default-features --features background_check,passport,openssl,all-attesters,bin
 # Copy trustee-attester
@@ -86,7 +83,6 @@ ARG TRUSTEE_REF=v0.15.0
 ENV TRUSTEE_REF=${TRUSTEE_REF}
 
 RUN git clone --single-branch --branch ${TRUSTEE_REF} https://github.com/confidential-containers/trustee.git
-# cargo build -p kbs-client --locked --release --no-default-features --features "kbs_protocol/background_check,kbs_protocol/passport,kbs_protocol/openssl,kbs_protocol/az-snp-vtpm-attester,kbs_protocol/az-tdx-vtpm-attester,kbs_protocol/snp-attester,kbs_protocol/tdx-attester"
 RUN cd /trustee/tools/kbs-client/ && \
     cargo build -p kbs-client --locked --release --no-default-features --features "sample_only,all-attesters"
 # Copy kbs-client
@@ -109,14 +105,10 @@ RUN cp /kata-containers/src/tools/genpolicy/target/release/genpolicy /tools/genp
 
 FROM quay.io/fedora/fedora:44 as tools-container
 
-LABEL konflux.additional-tags="latest 0.4.0"
-
 RUN dnf install -y tpm2-tss openssl-libs libgcc zlib-ng-compat
 
 # Install tdx deps from custom copr for now
-RUN dnf install -y 'dnf-command(copr)' && \
-    dnf copr enable -y berrange/sgx-ng && \
-    dnf install -y tdx-attest-libs
+RUN dnf install -y tdx-attest-libs
 
 COPY --from=build-container /tools /tools
 ENV PATH="/tools:${PATH}"
