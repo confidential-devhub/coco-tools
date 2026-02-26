@@ -1,0 +1,17 @@
+name: PR Build Check
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  build:
+    name: Build image (verification)
+    uses: ./.github/workflows/build-image.yml
+    with:
+      push: false

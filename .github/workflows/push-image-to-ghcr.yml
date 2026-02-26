@@ -1,0 +1,21 @@
+name: Push Image to GHCR
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    name: Build and push image
+    uses: ./.github/workflows/build-image.yml
+    with:
+      push: true
+      registry: ghcr.io/confidential-devhub/staged-images
+      image_name: coco-tools
+    secrets:
+      GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
