@@ -30,7 +30,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --de
 ENV PATH=$PATH:/root/.cargo/bin
 
 # Build snpguest
-ARG SNPGUEST_REF=v0.9.2
+ARG SNPGUEST_REF=v0.10.0
 ENV SNPGUEST_REF=${SNPGUEST_REF}
 
 RUN git clone --single-branch --branch ${SNPGUEST_REF} https://github.com/virtee/snpguest.git
@@ -40,7 +40,7 @@ RUN cd /snpguest/ && \
 RUN cp /snpguest/target/release/snpguest /tools/snpguest
 
 # Build snphost
-ARG SNPHOST_REF=main
+ARG SNPHOST_REF=v0.7.0
 ENV SNPHOST_REF=${SNPHOST_REF}
 
 RUN git clone --single-branch --branch ${SNPHOST_REF} https://github.com/virtee/snphost.git
@@ -57,7 +57,7 @@ RUN rustup default ${COCO_RUST_VERSION}
 
 
 # Build trustee-attester
-ARG GUEST_COMPONENTS_REF=v0.15.0
+ARG GUEST_COMPONENTS_REF=v0.17.0
 ENV GUEST_COMPONENTS_REF=${GUEST_COMPONENTS_REF}
 RUN git clone --single-branch --branch ${GUEST_COMPONENTS_REF} https://github.com/confidential-containers/guest-components.git
 RUN cd /guest-components/attestation-agent/kbs_protocol/ && \
@@ -79,20 +79,20 @@ RUN cp /guest-components/target/release/secret /tools/secret
 
 
 # Build kbs-client
-ARG TRUSTEE_REF=v0.15.0
+ARG TRUSTEE_REF=v0.17.0
 ENV TRUSTEE_REF=${TRUSTEE_REF}
 
 RUN git clone --single-branch --branch ${TRUSTEE_REF} https://github.com/confidential-containers/trustee.git
 RUN cd /trustee/tools/kbs-client/ && \
-    cargo build -p kbs-client --locked --release --no-default-features --features "sample_only,all-attesters"
+    cargo build -p kbs-client --locked --release --no-default-features --features "all-attesters"
 # Copy kbs-client
 RUN cp /trustee/target/release/kbs-client /tools/kbs-client
 
 
 # genpolicy
-ARG KATA_REF=3.21.0
+ARG KATA_REF=3.25.0
 ENV KATA_REF=${KATA_REF}
-ARG KATA_RUST_VERSION=1.85.1
+ARG KATA_RUST_VERSION=1.89.0
 ENV KATA_RUST_VERSION=${KATA_RUST_VERSION}
 RUN rustup default ${KATA_RUST_VERSION}
 RUN git clone --single-branch --branch ${KATA_REF} https://github.com/kata-containers/kata-containers.git
