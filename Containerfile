@@ -67,7 +67,7 @@ RUN cp /guest-components/target/release/trustee-attester /tools/trustee-attester
 
 # oneshot CDH
 RUN cd /guest-components/confidential-data-hub/hub && \
-    cargo build --release --no-default-features --features "bin,ttrpc,kbs" --bin ttrpc-cdh
+    cargo build --release --no-default-features --features "bin,ttrpc,kbs,sev" --bin ttrpc-cdh
 # Copy oneshot CDH
 RUN cp /guest-components/target/release/ttrpc-cdh /tools/ttrpc-cdh
 
@@ -96,12 +96,9 @@ ARG KATA_RUST_VERSION=1.89.0
 ENV KATA_RUST_VERSION=${KATA_RUST_VERSION}
 RUN rustup default ${KATA_RUST_VERSION}
 RUN git clone --single-branch --branch ${KATA_REF} https://github.com/kata-containers/kata-containers.git
-RUN cd /kata-containers/src/tools/genpolicy && \
-    COMMIT_HASH=$(git rev-parse HEAD 2>/dev/null) && \
-    sed -e "s|@COMMIT_INFO@|$COMMIT_HASH|g" "src/version.rs.in" > "src/version.rs" && \
-    cargo build --release
+RUN cd /kata-containers/src/tools/genpolicy && make
 # Copy genpolicy
-RUN cp /kata-containers/src/tools/genpolicy/target/release/genpolicy /tools/genpolicy
+RUN cp /kata-containers/src/tools/genpolicy/target/$(uname -m)-unknown-linux-gnu/release/genpolicy /tools/genpolicy
 
 FROM quay.io/fedora/fedora:44 as tools-container
 
