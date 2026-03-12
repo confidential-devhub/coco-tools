@@ -96,7 +96,7 @@ ARG KATA_RUST_VERSION=1.89.0
 ENV KATA_RUST_VERSION=${KATA_RUST_VERSION}
 RUN rustup default ${KATA_RUST_VERSION}
 RUN git clone --single-branch --branch ${KATA_REF} https://github.com/kata-containers/kata-containers.git
-RUN cd /kata-containers/src/tools/genpolicy && make
+RUN cd /kata-containers/src/tools/genpolicy && make LIBC=gnu
 # Copy genpolicy
 RUN cp /kata-containers/src/tools/genpolicy/target/$(uname -m)-unknown-linux-gnu/release/genpolicy /tools/genpolicy
 
