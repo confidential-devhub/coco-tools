@@ -12,22 +12,24 @@ RUN dnf install -y \
     sgx-devel
 
 
-## Install rust
-ARG COCO_RUST_VERSION=1.85.1
+## Install Rust toolchains
+# COCO_RUST_VERSION: used as the default; matches guest-components and trustee
+#   rust-toolchain.toml, and satisfies snpguest (MSRV 1.86) and snphost (MSRV 1.85)
+# KATA_RUST_VERSION: pre-installed for genpolicy; kata's rust-toolchain.toml
+#   auto-selects it when cargo runs inside the kata source tree
+ARG COCO_RUST_VERSION=1.90.0
 ENV COCO_RUST_VERSION=${COCO_RUST_VERSION}
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain ${COCO_RUST_VERSION}
 ENV PATH=$PATH:/root/.cargo/bin
+
+ARG KATA_RUST_VERSION=1.91.0
+ENV KATA_RUST_VERSION=${KATA_RUST_VERSION}
+RUN rustup toolchain install ${KATA_RUST_VERSION}
 
 # Directory to keep all the tools
 RUN mkdir /tools
 
 # Build different binaries
-
-## Install rust
-ARG SNPGUEST_RUST_VERSION=1.86.0
-ENV SNPGUEST_RUST_VERSION=${SNPGUEST_RUST_VERSION}
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain ${SNPGUEST_RUST_VERSION}
-ENV PATH=$PATH:/root/.cargo/bin
 
 # Build snpguest
 ARG SNPGUEST_REF=v0.10.0
@@ -48,12 +50,6 @@ RUN cd /snphost/ && \
     cargo build -r
 # Copy snphost
 RUN cp /snphost/target/release/snphost /tools/snphost
-
-
-## Install rust
-ARG COCO_RUST_VERSION=1.85.1
-ENV COCO_RUST_VERSION=${COCO_RUST_VERSION}
-RUN rustup default ${COCO_RUST_VERSION}
 
 
 # Build trustee-attester
@@ -89,12 +85,10 @@ RUN cd /trustee/tools/kbs-client/ && \
 RUN cp /trustee/target/release/kbs-client /tools/kbs-client
 
 
-# genpolicy
+# genpolicy — kata's rust-toolchain.toml (channel = "1.91") auto-selects the
+# pre-installed KATA_RUST_VERSION toolchain when cargo is invoked by make
 ARG KATA_REF=3.25.0
 ENV KATA_REF=${KATA_REF}
-ARG KATA_RUST_VERSION=1.89.0
-ENV KATA_RUST_VERSION=${KATA_RUST_VERSION}
-RUN rustup default ${KATA_RUST_VERSION}
 RUN git clone --single-branch --branch ${KATA_REF} https://github.com/kata-containers/kata-containers.git
 RUN cd /kata-containers/src/tools/genpolicy && make LIBC=gnu
 # Copy genpolicy

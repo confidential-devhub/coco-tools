@@ -22,6 +22,7 @@ jobs:
     outputs:
       coco_tag: ${{ steps.release.outputs.tag }}
       needs_build: ${{ steps.check.outputs.needs_build }}
+      coco_rust_version: ${{ steps.rust.outputs.version }}
     steps:
       - name: Get latest CoCo release tag
         id: release
@@ -52,6 +53,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
+      - name: Get COCO_RUST_VERSION from guest-components rust-toolchain.toml
+        id: rust
+        run: |
+          TAG="${{ steps.release.outputs.tag }}"
+          VERSION=$(gh api \
+            "repos/confidential-containers/guest-components/contents/rust-toolchain.toml?ref=${TAG}" \
+            --jq '.content' | base64 -d | grep 'channel' | sed 's/.*"\(.*\)".*/\1/')
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "guest-components Rust version at ${TAG}: ${VERSION}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
   build:
     name: Build and push release image
     needs: check
@@ -62,6 +75,7 @@ jobs:
       registry: ghcr.io/confidential-devhub/staged-images
       image_name: coco-tools
       version_tag: ${{ needs.check.outputs.coco_tag }}
+      build_args: COCO_RUST_VERSION=${{ needs.check.outputs.coco_rust_version }}
     secrets:
       GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
