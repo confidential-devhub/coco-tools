@@ -94,7 +94,7 @@ RUN cd /kata-containers/src/tools/genpolicy && make LIBC=gnu
 # Copy genpolicy
 RUN cp /kata-containers/src/tools/genpolicy/target/$(uname -m)-unknown-linux-gnu/release/genpolicy /tools/genpolicy
 
-FROM quay.io/fedora/fedora:44 as tools-container
+FROM quay.io/fedora/fedora:44 AS tools-container
 
 RUN dnf install -y tpm2-tss openssl-libs libgcc zlib-ng-compat
 

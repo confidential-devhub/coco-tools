@@ -110,6 +110,14 @@ RUN cd /kata-containers/src/tools/genpolicy && make LIBC=gnu
 # Copy genpolicy
 RUN cp /kata-containers/src/tools/genpolicy/target/$(uname -m)-unknown-linux-gnu/release/genpolicy /tools/genpolicy
 
+# Build tdx-measure (used by veritas for TDX RTMR computation)
+ARG TDX_MEASURE_REF=main
+ENV TDX_MEASURE_REF=${TDX_MEASURE_REF}
+RUN git clone --single-branch --branch ${TDX_MEASURE_REF} https://github.com/virtee/tdx-measure.git
+RUN cd /tdx-measure/cli && \
+    cargo build -r
+RUN cp /tdx-measure/cli/target/release/tdx-measure /tools/tdx-measure
+
 
 FROM registry.access.redhat.com/ubi10:10.1-1772441712 AS tools-container
 
@@ -122,12 +130,22 @@ RUN --mount=type=secret,id=org,dst=/run/secrets/org \
     && subscription-manager repos --enable=rhel-10-for-x86_64-supplementary-rpms \
     && subscription-manager repos --enable=rhel-10-for-x86_64-extensions-rpms  \
     && subscription-manager repos --enable=rhel-10-for-x86_64-appstream-rpms  \
-    && subscription-manager repos --enable=codeready-builder-for-rhel-10-x86_64-rpms  
+    && subscription-manager repos --enable=codeready-builder-for-rhel-10-x86_64-rpms
 
 
 RUN dnf install -y tpm2-tss openssl-libs libgcc zlib
 
 RUN subscription-manager unregister
+
+# Python + oc CLI for veritas (oc adm release info is OpenShift-specific)
+RUN dnf install -y python3 python3-pip git cpio
+RUN curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz \
+    | tar xzf - -C /usr/local/bin oc
+
+# Install veritas and its SNP dependency
+ARG VERITAS_REF=main
+RUN pip install --no-cache-dir \
+    "git+https://github.com/confidential-devhub/veritas.git@${VERITAS_REF}#egg=veritas[snp]"
 
 COPY --from=build-container /tools /tools
 ENV PATH="/tools:${PATH}"
