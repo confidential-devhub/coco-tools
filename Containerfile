@@ -94,12 +94,30 @@ RUN cd /kata-containers/src/tools/genpolicy && make LIBC=gnu
 # Copy genpolicy
 RUN cp /kata-containers/src/tools/genpolicy/target/$(uname -m)-unknown-linux-gnu/release/genpolicy /tools/genpolicy
 
+# Build tdx-measure (used by veritas for TDX RTMR computation)
+ARG TDX_MEASURE_REF=main
+ENV TDX_MEASURE_REF=${TDX_MEASURE_REF}
+RUN git clone --single-branch --branch ${TDX_MEASURE_REF} https://github.com/virtee/tdx-measure.git
+RUN cd /tdx-measure/cli && \
+    cargo build -r
+RUN cp /tdx-measure/cli/target/release/tdx-measure /tools/tdx-measure
+
 FROM quay.io/fedora/fedora:44 AS tools-container
 
 RUN dnf install -y tpm2-tss openssl-libs libgcc zlib-ng-compat
 
 # Install tdx deps from custom copr for now
 RUN dnf install -y tdx-attest-libs
+
+# Python + oc CLI for veritas
+RUN dnf install -y python3 python3-pip git cpio
+RUN curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz \
+    | tar xzf - -C /usr/local/bin oc
+
+# Install veritas and its SNP dependency
+ARG VERITAS_REF=main
+RUN pip install --no-cache-dir \
+    "veritas[snp] @ git+https://github.com/confidential-devhub/veritas.git@${VERITAS_REF}"
 
 COPY --from=build-container /tools /tools
 ENV PATH="/tools:${PATH}"
