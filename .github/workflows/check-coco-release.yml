@@ -100,10 +100,8 @@ jobs:
         run: |
           IMAGE="ghcr.io/confidential-devhub/staged-images/coco-tools:${COCO_TAG}"
           COCO_URL="https://github.com/confidential-containers/confidential-containers/releases/tag/${COCO_TAG}"
+          NOTES=$(printf 'coco-tools container image built for CoCo release [%s](%s).\n\n```\ndocker pull %s\n```' \
+            "${COCO_TAG}" "${COCO_URL}" "${IMAGE}")
           gh release create "${COCO_TAG}" \
             --title "coco-tools ${COCO_TAG}" \
-            --notes "coco-tools container image built for CoCo release [${COCO_TAG}](${COCO_URL}).
-
-\`\`\`
-docker pull ${IMAGE}
-\`\`\`"
+            --notes "${NOTES}"
