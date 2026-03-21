@@ -1,4 +1,4 @@
-name: Push Image to GHCR
+name: Push Images on Merge
 
 on:
   push:
@@ -18,8 +18,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-push:
-    name: Build and push image
+  build-and-push-fedora:
+    name: Build and push Fedora image
     uses: ./.github/workflows/build-image.yml
     with:
       push: true
@@ -27,3 +27,14 @@ jobs:
       image_name: coco-tools
     secrets:
       GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-and-push-ubi:
+    name: Build and push UBI image
+    uses: ./.github/workflows/build-ubi-image.yml
+    with:
+      push: true
+    secrets:
+      ORG_ID: ${{ secrets.ORG_ID }}
+      ACTIVATION_KEY: ${{ secrets.ACTIVATION_KEY }}
+      QUAY_USER: ${{ secrets.QUAY_USER }}
+      QUAY_SECRET: ${{ secrets.QUAY_SECRET }}

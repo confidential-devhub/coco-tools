@@ -8,11 +8,10 @@ on:
 permissions:
   contents: read
   packages: read
-  actions: write
 
 jobs:
-  build:
-    name: Build image (verification)
+  build-fedora:
+    name: Build Fedora image (verification)
     uses: ./.github/workflows/build-image.yml
     with:
       push: false

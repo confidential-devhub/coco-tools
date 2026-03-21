@@ -1,4 +1,4 @@
-name: Build Container Image
+name: Build UBI Container Image
 
 on:
   workflow_call:
@@ -8,33 +8,24 @@ on:
         required: false
         default: false
         type: boolean
-      registry:
-        description: 'Container registry path'
-        required: false
-        default: 'ghcr.io/confidential-devhub/staged-images'
-        type: string
-      image_name:
-        description: 'Image name'
-        required: false
-        default: 'coco-tools'
-        type: string
       version_tag:
-        description: 'Additional version tag to apply (e.g. v0.18.0)'
-        required: false
-        default: ''
-        type: string
-      build_args:
-        description: 'Newline-separated build arguments to pass to Docker (KEY=VALUE)'
+        description: 'Additional version tag to apply (e.g. 0.4.0)'
         required: false
         default: ''
         type: string
     secrets:
-      GHCR_TOKEN:
+      ORG_ID:
+        required: true
+      ACTIVATION_KEY:
+        required: true
+      QUAY_USER:
+        required: false
+      QUAY_SECRET:
         required: false
 
 jobs:
   build:
-    name: Build image
+    name: Build UBI image
     runs-on: ubuntu-24.04
 
     steps:
@@ -44,26 +35,25 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2  # v3.10.0
 
-      - name: Log in to GHCR
+      - name: Log in to Quay.io
         if: ${{ inputs.push }}
         uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772  # v3.4.0
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_TOKEN }}
+          registry: quay.io
+          username: ${{ secrets.QUAY_USER }}
+          password: ${{ secrets.QUAY_SECRET }}
 
       - name: Compute image tags
         if: ${{ inputs.push }}
         id: tags
         env:
-          INPUT_REGISTRY: ${{ inputs.registry }}
-          INPUT_IMAGE_NAME: ${{ inputs.image_name }}
           INPUT_VERSION_TAG: ${{ inputs.version_tag }}
         run: |
-          TAGS="${INPUT_REGISTRY}/${INPUT_IMAGE_NAME}:${{ github.sha }}"
-          TAGS+=$'\n'"${INPUT_REGISTRY}/${INPUT_IMAGE_NAME}:latest"
+          IMAGE="quay.io/openshift_sandboxed_containers/coco-tools"
+          TAGS="${IMAGE}:${{ github.sha }}"
+          TAGS+=$'\n'"${IMAGE}:latest"
           if [ -n "${INPUT_VERSION_TAG}" ]; then
-            TAGS+=$'\n'"${INPUT_REGISTRY}/${INPUT_IMAGE_NAME}:${INPUT_VERSION_TAG}"
+            TAGS+=$'\n'"${IMAGE}:${INPUT_VERSION_TAG}"
           fi
           { echo "list<<EOF"; echo "$TAGS"; echo "EOF"; } >> "$GITHUB_OUTPUT"
 
@@ -72,9 +62,11 @@ jobs:
         uses: docker/build-push-action@14487ce63c7a62a4a324b0bfb37086795e31c6c1  # v6.16.0
         with:
           context: .
-          file: Containerfile
-          build-args: ${{ inputs.build_args }}
-          cache-from: type=gha,scope=fedora
+          file: Containerfile.ubi
+          secrets: |
+            org=${{ secrets.ORG_ID }}
+            key=${{ secrets.ACTIVATION_KEY }}
+          cache-from: type=gha,scope=ubi
           # cache-to intentionally omitted: PR builds must not write to the
           # shared cache used by push/release builds (cache poisoning risk)
 
@@ -83,9 +75,11 @@ jobs:
         uses: docker/build-push-action@14487ce63c7a62a4a324b0bfb37086795e31c6c1  # v6.16.0
         with:
           context: .
-          file: Containerfile
+          file: Containerfile.ubi
           push: true
           tags: ${{ steps.tags.outputs.list }}
-          build-args: ${{ inputs.build_args }}
-          cache-from: type=gha,scope=fedora
-          cache-to: type=gha,mode=max,scope=fedora
+          secrets: |
+            org=${{ secrets.ORG_ID }}
+            key=${{ secrets.ACTIVATION_KEY }}
+          cache-from: type=gha,scope=ubi
+          cache-to: type=gha,mode=max,scope=ubi

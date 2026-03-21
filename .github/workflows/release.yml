@@ -1,0 +1,61 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write  # used transitively by build-image.yml to push to GHCR
+  actions: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false  # queue releases rather than cancel an in-progress push
+
+jobs:
+  version:
+    name: Read version
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.read.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      - name: Read version from versions.yaml
+        id: read
+        run: |
+          VERSION=$(python3 -c "import yaml; print(yaml.safe_load(open('versions.yaml'))['version'])")
+          if [ -z "${VERSION}" ]; then
+            echo "Error: could not read version from versions.yaml" >&2
+            exit 1
+          fi
+          echo "tag=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Releasing version: ${VERSION}"
+
+  release-fedora:
+    name: Build and push Fedora image
+    needs: version
+    uses: ./.github/workflows/build-image.yml
+    with:
+      push: true
+      registry: ghcr.io/confidential-devhub/staged-images
+      image_name: coco-tools
+      version_tag: ${{ needs.version.outputs.tag }}
+    secrets:
+      GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  release-ubi:
+    name: Build and push UBI image
+    needs: version
+    uses: ./.github/workflows/build-ubi-image.yml
+    with:
+      push: true
+      version_tag: ${{ needs.version.outputs.tag }}
+    secrets:
+      ORG_ID: ${{ secrets.ORG_ID }}
+      ACTIVATION_KEY: ${{ secrets.ACTIVATION_KEY }}
+      QUAY_USER: ${{ secrets.QUAY_USER }}
+      QUAY_SECRET: ${{ secrets.QUAY_SECRET }}
