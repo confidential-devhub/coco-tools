@@ -5,15 +5,20 @@ on:
     - cron: '0 8 * * 1'  # Weekly on Monday at 08:00 UTC
   workflow_dispatch:
     inputs:
-      force_rebuild:
-        description: 'Force rebuild even if the image tag already exists'
+      force_update:
+        description: 'Force PR creation even if one already exists for this release'
         required: false
         default: false
         type: boolean
 
+# Prevent overlapping runs from racing on branch push / PR creation
+concurrency:
+  group: check-coco-release
+  cancel-in-progress: false
+
 permissions:
   contents: write
-  packages: write
+  pull-requests: write
 
 jobs:
   check:
@@ -21,8 +26,7 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       coco_tag: ${{ steps.release.outputs.tag }}
-      needs_build: ${{ steps.check.outputs.needs_build }}
-      coco_rust_version: ${{ steps.rust.outputs.version }}
+      needs_update: ${{ steps.check.outputs.needs_update }}
     steps:
       - name: Get latest CoCo release tag
         id: release
@@ -38,70 +42,221 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-      - name: Check if image tag already exists in GHCR
+      - name: Check if a PR already exists for this release
         id: check
         env:
           GH_TOKEN: ${{ github.token }}
           COCO_TAG: ${{ steps.release.outputs.tag }}
-          FORCE_REBUILD: ${{ inputs.force_rebuild }}
+          FORCE_UPDATE: ${{ inputs.force_update }}
         run: |
-          FOUND=$(gh api \
-            "/orgs/confidential-devhub/packages/container/staged-images%2Fcoco-tools/versions" \
-            --jq --arg t "${COCO_TAG}" \
-            '[.[].metadata.container.tags // [] | .[] | select(. == $t)] | length > 0' \
-            2>/dev/null || echo "false")
-          if [[ "$FOUND" == "true" && "${FORCE_REBUILD}" != "true" ]]; then
-            echo "needs_build=false" >> "$GITHUB_OUTPUT"
-            echo "Image tag ${COCO_TAG} already exists — skipping build."
+          BRANCH="update/coco-${COCO_TAG}"
+          # Fail fast on gh errors rather than silently defaulting to "false"
+          if ! PR_EXISTS=$(gh pr list \
+            --repo ${{ github.repository }} \
+            --head "${BRANCH}" \
+            --state open \
+            --json number \
+            --jq 'length > 0'); then
+            echo "ERROR: Failed to check for an existing PR for ${COCO_TAG}." >&2
+            exit 1
+          fi
+          if [[ "$PR_EXISTS" == "true" && "${FORCE_UPDATE}" != "true" ]]; then
+            echo "needs_update=false" >> "$GITHUB_OUTPUT"
+            echo "PR for ${COCO_TAG} already exists — skipping."
           else
-            echo "needs_build=true" >> "$GITHUB_OUTPUT"
-            echo "Image tag ${COCO_TAG} not found — triggering build."
+            echo "needs_update=true" >> "$GITHUB_OUTPUT"
+            echo "No open PR found for ${COCO_TAG} — will create one."
           fi
 
-      - name: Get COCO_RUST_VERSION from guest-components rust-toolchain.toml
-        id: rust
-        env:
-          GH_TOKEN: ${{ github.token }}
-          COCO_TAG: ${{ steps.release.outputs.tag }}
-        run: |
-          VERSION=$(gh api \
-            "repos/confidential-containers/guest-components/contents/rust-toolchain.toml?ref=${COCO_TAG}" \
-            --jq '.content' | base64 -d | grep 'channel' | sed 's/.*"\(.*\)".*/\1/')
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "guest-components Rust version at ${COCO_TAG}: ${VERSION}"
-
-  build:
-    name: Build and push release image
-    needs: check
-    if: needs.check.outputs.needs_build == 'true'
-    uses: ./.github/workflows/build-image.yml
-    with:
-      push: true
-      registry: ghcr.io/confidential-devhub/staged-images
-      image_name: coco-tools
-      version_tag: ${{ needs.check.outputs.coco_tag }}
-      build_args: COCO_RUST_VERSION=${{ needs.check.outputs.coco_rust_version }}
-    secrets:
-      GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  release:
-    name: Create GitHub release
+  create-pr:
+    name: Create Containerfile update PR
     runs-on: ubuntu-24.04
-    needs: [check, build]
-    if: needs.check.outputs.needs_build == 'true'
+    needs: check
+    if: needs.check.outputs.needs_update == 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
 
-      - name: Create GitHub release
+      - name: Parse component versions from CoCo release notes
+        id: versions
         env:
           GH_TOKEN: ${{ github.token }}
           COCO_TAG: ${{ needs.check.outputs.coco_tag }}
         run: |
-          IMAGE="ghcr.io/confidential-devhub/staged-images/coco-tools:${COCO_TAG}"
+          # Fetch and decode release notes separately so failures are caught early
+          if ! ENCODED_NOTES=$(gh api \
+            "repos/confidential-containers/confidential-containers/contents/releases/${COCO_TAG}.md" \
+            --jq '.content'); then
+            echo "ERROR: Failed to fetch release notes for ${COCO_TAG}" >&2
+            exit 1
+          fi
+          if ! NOTES=$(base64 -d <<< "${ENCODED_NOTES}"); then
+            echo "ERROR: Failed to decode release notes for ${COCO_TAG}" >&2
+            exit 1
+          fi
+
+          # Kata Containers version — "based on [3.28.0](...) of Kata Containers"
+          # head -1 guards against multiple matches in the release notes
+          KATA_REF=$(echo "$NOTES" | grep -oP 'based on \[\K[^\]]+(?=\].*of Kata Containers)' | head -1)
+          if [ -z "${KATA_REF}" ]; then
+            echo "ERROR: Could not parse Kata Containers version from release notes" >&2
+            exit 1
+          fi
+          if [[ ! "${KATA_REF}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "ERROR: Parsed KATA_REF '${KATA_REF}' is not a valid semver" >&2
+            exit 1
+          fi
+
+          # Trustee / guest-components version — "uses v0.18.0 of Trustee and guest components"
+          # head -1 guards against multiple matches in the release notes
+          GC_REF=$(echo "$NOTES" | grep -oP 'uses \Kv[0-9]+\.[0-9]+\.[0-9]+(?= of Trustee)' | head -1)
+          if [ -z "${GC_REF}" ]; then
+            echo "ERROR: Could not parse Trustee/guest-components version from release notes" >&2
+            exit 1
+          fi
+          if [[ ! "${GC_REF}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "ERROR: Parsed GC_REF '${GC_REF}' is not a valid semver" >&2
+            exit 1
+          fi
+
+          # CoCo Rust version (optional line) — "Trustee and guest components use/uses Rust v1.90.0"
+          COCO_RUST=$(echo "$NOTES" | grep -oP '(?i)uses? Rust \Kv[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
+          COCO_RUST="${COCO_RUST#v}"  # strip leading 'v' to match ARG format
+
+          # Kata genpolicy Rust version — fetch from kata-containers rust-toolchain.toml at KATA_REF
+          KATA_RUST=$(gh api \
+            "repos/kata-containers/kata-containers/contents/rust-toolchain.toml?ref=${KATA_REF}" \
+            --jq '.content' 2>/dev/null | base64 -d 2>/dev/null \
+            | grep 'channel' | sed 's/.*"\(.*\)".*/\1/' || true)
+
+          echo "kata_ref=${KATA_REF}" >> "$GITHUB_OUTPUT"
+          echo "gc_ref=${GC_REF}" >> "$GITHUB_OUTPUT"
+          echo "coco_rust=${COCO_RUST}" >> "$GITHUB_OUTPUT"
+          echo "kata_rust=${KATA_RUST}" >> "$GITHUB_OUTPUT"
+
+          echo "Kata Containers: ${KATA_REF}"
+          echo "guest-components / Trustee: ${GC_REF}"
+          echo "CoCo Rust: ${COCO_RUST:-<not in release notes, keeping current>}"
+          echo "Kata genpolicy Rust: ${KATA_RUST:-<not found, keeping current>}"
+
+      - name: Update Containerfiles
+        env:
+          KATA_REF: ${{ steps.versions.outputs.kata_ref }}
+          GC_REF: ${{ steps.versions.outputs.gc_ref }}
+          COCO_RUST: ${{ steps.versions.outputs.coco_rust }}
+          KATA_RUST: ${{ steps.versions.outputs.kata_rust }}
+        run: |
+          for f in Containerfile Containerfile.ubi; do
+            sed -i "s|^ARG GUEST_COMPONENTS_REF=.*|ARG GUEST_COMPONENTS_REF=${GC_REF}|" "${f}"
+            sed -i "s|^ARG TRUSTEE_REF=.*|ARG TRUSTEE_REF=${GC_REF}|" "${f}"
+            sed -i "s|^ARG KATA_REF=.*|ARG KATA_REF=${KATA_REF}|" "${f}"
+            if [ -n "${COCO_RUST}" ]; then
+              sed -i "s|^ARG COCO_RUST_VERSION=.*|ARG COCO_RUST_VERSION=${COCO_RUST}|" "${f}"
+            fi
+            if [ -n "${KATA_RUST}" ]; then
+              sed -i "s|^ARG KATA_RUST_VERSION=.*|ARG KATA_RUST_VERSION=${KATA_RUST}|" "${f}"
+            fi
+          done
+
+      - name: Update versions.yaml
+        env:
+          COCO_TAG: ${{ needs.check.outputs.coco_tag }}
+        run: |
+          VERSION="${COCO_TAG#v}"  # strip leading 'v' to match existing format
+          sed -i "s|^version:.*|version: \"${VERSION}\"|" versions.yaml
+
+      - name: Commit, push branch, and open PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COCO_TAG: ${{ needs.check.outputs.coco_tag }}
+          KATA_REF: ${{ steps.versions.outputs.kata_ref }}
+          GC_REF: ${{ steps.versions.outputs.gc_ref }}
+          COCO_RUST: ${{ steps.versions.outputs.coco_rust }}
+          KATA_RUST: ${{ steps.versions.outputs.kata_rust }}
+        run: |
+          BRANCH="update/coco-${COCO_TAG}"
+          VERSION="${COCO_TAG#v}"
           COCO_URL="https://github.com/confidential-containers/confidential-containers/releases/tag/${COCO_TAG}"
-          NOTES=$(printf 'coco-tools container image built for CoCo release [%s](%s).\n\n```\ndocker pull %s\n```' \
-            "${COCO_TAG}" "${COCO_URL}" "${IMAGE}")
-          gh release create "${COCO_TAG}" \
-            --title "coco-tools ${COCO_TAG}" \
-            --notes "${NOTES}"
+          NOTES_URL="https://github.com/confidential-containers/confidential-containers/blob/main/releases/${COCO_TAG}.md"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "${BRANCH}"
+          git add Containerfile Containerfile.ubi versions.yaml
+
+          # Skip commit and PR if nothing changed
+          if git diff --cached --quiet; then
+            echo "No changes detected — component versions already up to date for CoCo ${COCO_TAG}."
+            exit 0
+          fi
+
+          git commit -m "Update component refs for CoCo ${COCO_TAG}"
+          # Push with lease — handling three cases explicitly so the safety guarantee is reliable
+          git ls-remote --exit-code --heads origin "${BRANCH}" > /dev/null 2>&1
+          ls_remote_status=$?
+          if [ "${ls_remote_status}" -eq 0 ]; then
+            # Remote branch exists: fetch it so --force-with-lease has a tracking ref to compare against
+            git fetch --no-tags origin "+refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}"
+            git push --force-with-lease origin "${BRANCH}"
+          elif [ "${ls_remote_status}" -eq 2 ]; then
+            # Remote branch does not exist: push with an empty lease requiring it to remain absent
+            git push --force-with-lease="refs/heads/${BRANCH}:" origin "${BRANCH}"
+          else
+            echo "ERROR: Failed to determine whether remote branch ${BRANCH} exists." >&2
+            exit 1
+          fi
+
+          # Build PR body with explicit echo lines to avoid heredoc indentation issues
+          PR_BODY=$(mktemp)
+          {
+            echo "Automated update for CoCo release [${COCO_TAG}](${COCO_URL})."
+            echo ""
+            echo "## Component versions (parsed from [release notes](${NOTES_URL}))"
+            echo ""
+            echo "| Argument | New value |"
+            echo "|---|---|"
+            echo "| \`GUEST_COMPONENTS_REF\` | \`${GC_REF}\` |"
+            echo "| \`TRUSTEE_REF\` | \`${GC_REF}\` |"
+            echo "| \`KATA_REF\` | \`${KATA_REF}\` |"
+            # Use backticks for actual values; italics only for the "unchanged" placeholder
+            if [ -n "${COCO_RUST}" ]; then
+              echo "| \`COCO_RUST_VERSION\` | \`${COCO_RUST}\` |"
+            else
+              echo "| \`COCO_RUST_VERSION\` | _(not in release notes — unchanged)_ |"
+            fi
+            if [ -n "${KATA_RUST}" ]; then
+              echo "| \`KATA_RUST_VERSION\` | \`${KATA_RUST}\` |"
+            else
+              echo "| \`KATA_RUST_VERSION\` | _(not found in rust-toolchain.toml — unchanged)_ |"
+            fi
+            echo ""
+            echo "## Manual review required"
+            echo ""
+            echo "- [ ] Check \`SNPGUEST_REF\` — verify the current ref is compatible with CoCo ${COCO_TAG}"
+            echo "- [ ] Check \`SNPHOST_REF\` — verify the current ref is compatible with CoCo ${COCO_TAG}"
+            echo "- [ ] Check \`TDX_MEASURE_REF\` and \`VERITAS_REF\` if those projects have relevant updates"
+            echo ""
+            echo "## After merge"
+            echo ""
+            echo "- Push to \`main\` triggers \`push-image-to-ghcr.yml\` → publishes \`:latest\`"
+            echo "- Publish a GitHub release tagged \`${COCO_TAG}\` to trigger \`release.yml\` → publishes \`:${VERSION}\`"
+          } > "${PR_BODY}"
+
+          # If a PR already exists (force_update=true case), update its body; otherwise create it
+          EXISTING_PR=$(gh pr list \
+            --repo ${{ github.repository }} \
+            --head "${BRANCH}" \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty' 2>/dev/null || true)
+
+          if [ -n "${EXISTING_PR}" ]; then
+            gh pr edit "${EXISTING_PR}" --body-file "${PR_BODY}"
+            echo "Updated existing PR #${EXISTING_PR} for ${COCO_TAG}."
+          else
+            gh pr create \
+              --title "Update component refs for CoCo ${COCO_TAG}" \
+              --base main \
+              --head "${BRANCH}" \
+              --body-file "${PR_BODY}"
+          fi
