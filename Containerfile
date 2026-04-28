@@ -104,7 +104,13 @@ RUN cp /tdx-measure/cli/target/release/tdx-measure /tools/tdx-measure
 
 FROM quay.io/fedora/fedora:44 AS tools-container
 
-RUN dnf install -y tpm2-tss openssl-libs libgcc zlib-ng-compat
+RUN dnf install -y tpm2-tss openssl-libs libgcc zlib-ng-compat skopeo
+
+ARG COSIGN_VERSION=v3.0.6
+RUN ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') && \
+    curl -sLo /usr/local/bin/cosign \
+        "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-${ARCH}" && \
+    chmod +x /usr/local/bin/cosign
 
 # Install tdx deps from custom copr for now
 RUN dnf install -y tdx-attest-libs
