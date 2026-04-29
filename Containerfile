@@ -120,7 +120,8 @@ RUN dnf install -y python3 python3-pip git cpio
 RUN curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz \
     | tar xzf - -C /usr/local/bin oc
 
-# Install veritas and its SNP dependency
+# Install veritas with SNP and TDX support.
+# Base install covers TDX (uses tdx-measure binary); [snp] extra adds sev-snp-measure for SNP
 ARG VERITAS_REF=main
 RUN pip install --no-cache-dir \
     "veritas[snp] @ git+https://github.com/confidential-devhub/veritas.git@${VERITAS_REF}"
