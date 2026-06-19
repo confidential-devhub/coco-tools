@@ -1,0 +1,32 @@
+{
+  "packages": [
+    {
+      "type": "pip",
+      "path": "."
+    },
+    {
+      "type": "cargo",
+      "path": "snpguest"
+    },
+    {
+      "type": "cargo",
+      "path": "snphost"
+    },
+    {
+      "type": "cargo",
+      "path": "guest-components"
+    },
+    {
+      "type": "cargo",
+      "path": "trustee"
+    },
+    {
+      "type": "cargo",
+      "path": "kata-containers"
+    },
+    {
+      "type": "cargo",
+      "path": "tdx-measure"
+    }
+  ]
+}

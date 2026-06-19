@@ -1,0 +1,30 @@
+packages:
+  # build-container stage
+  - git
+  - rust
+  - cargo
+  - tpm2-tss-devel
+  - protobuf-compiler
+  - perl-core
+  - cmake
+  - clang
+  # tools-container stage
+  - tpm2-tss
+  - openssl-libs
+  - libgcc
+  - zlib
+  - skopeo
+  - python3
+  - python3-pip
+  - cpio
+
+contentOrigin:
+  repofiles:
+    - ./ubi.repo
+    - ./redhat.repo
+
+arches:
+  - x86_64
+
+context:
+  containerfile: Containerfile.ubi
