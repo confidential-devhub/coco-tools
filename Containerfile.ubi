@@ -80,7 +80,7 @@ RUN cp /workdir/guest-components/target/release/secret /tools/secret
 
 # Build kbs-client
 WORKDIR /workdir/trustee/tools/kbs-client
-RUN cargo build -p kbs-client --locked --release --no-default-features --features "all-attesters"
+RUN cargo build -p kbs-client --locked --release --features "all-attesters"
 RUN cp /workdir/trustee/target/release/kbs-client /tools/kbs-client
 
 # genpolicy — without rustup, cargo uses the system Rust (1.92.0 from RPM).
