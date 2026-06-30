@@ -1,2 +1,23 @@
+# Secrets for local non-hermetic builds
 org.txt
 activation-key.txt
+
+# Dependencies cache (local hermetic testing only)
+/deps/
+/hermeto-output/
+
+# Test files (not for PR)
+Containerfile.hermetic-test
+Containerfile.test-vendor
+
+# User-specific files
+.bash_profile
+.bashrc
+.gitconfig
+.profile
+.ripgreprc
+.zprofile
+.zshrc
+.vscode/
+.idea/
+.mcp.json

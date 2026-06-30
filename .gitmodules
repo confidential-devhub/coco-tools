@@ -1,0 +1,21 @@
+[submodule "snpguest"]
+	path = snpguest
+	url = https://github.com/virtee/snpguest.git
+[submodule "snphost"]
+	path = snphost
+	url = https://github.com/virtee/snphost.git
+[submodule "guest-components"]
+	path = guest-components
+	url = https://github.com/openshift/confidential-containers-guest-components.git
+	branch = osc-release
+[submodule "trustee"]
+	path = trustee
+	url = https://github.com/openshift/trustee.git
+	branch = main
+[submodule "kata-containers"]
+	path = kata-containers
+	url = https://github.com/openshift/kata-containers.git
+	branch = osc-release
+[submodule "tdx-measure"]
+	path = tdx-measure
+	url = https://github.com/virtee/tdx-measure.git
