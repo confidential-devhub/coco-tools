@@ -1,1 +1,1 @@
-veritas[snp] @ git+https://github.com/confidential-devhub/veritas.git@ff9a094dcacd5194930e8b0e2f6ca73e36c05b79
+veritas[snp] @ git+https://github.com/confidential-devhub/veritas.git@v0.1.0
