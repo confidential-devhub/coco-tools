@@ -122,7 +122,7 @@ RUN curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/op
 
 # Install veritas with SNP and TDX support.
 # Base install covers TDX (uses tdx-measure binary); [snp] extra adds sev-snp-measure for SNP
-ARG VERITAS_REF=v0.1.1
+ARG VERITAS_REF=48d72f7b3b9dc3ee14b9104b20ad3207cf425fbd
 RUN pip install --no-cache-dir \
     "veritas[snp] @ git+https://github.com/confidential-devhub/veritas.git@${VERITAS_REF}"
 
