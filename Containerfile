@@ -120,6 +120,21 @@ RUN dnf install -y python3 python3-pip git cpio
 RUN curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz \
     | tar xzf - -C /usr/local/bin oc
 
+# Install PCS Client from a pinned upstream revision with the local patch.
+ARG PCSCLIENT_REF=64b78f3766e7196d3d2c60e401540f0f853b2deb
+ARG PCSCLIENT_SHA256=7a383de6d019688c91e8c02bf19270f22e4750ae01992c7ff86afd61bbbd6a62
+COPY pcsclient-package /tmp/pcsclient-package
+RUN curl -sL \
+        "https://github.com/intel/confidential-computing.tee.dcap/archive/${PCSCLIENT_REF}.tar.gz" \
+        -o /tmp/pcsclient.tar.gz && \
+    echo "${PCSCLIENT_SHA256}  /tmp/pcsclient.tar.gz" | sha256sum -c - && \
+    mkdir /tmp/pcsclient-source && \
+    tar xzf /tmp/pcsclient.tar.gz --strip-components=1 -C /tmp/pcsclient-source && \
+    cd /tmp/pcsclient-source && \
+    git apply --unidiff-zero /tmp/pcsclient-package/serialize-identities.patch && \
+    cp /tmp/pcsclient-package/pyproject.toml tools/PcsClientTool/ && \
+    pip install --no-cache-dir tools/PcsClientTool
+
 # Install veritas with SNP and TDX support.
 # Base install covers TDX (uses tdx-measure binary); [snp] extra adds sev-snp-measure for SNP
 ARG VERITAS_REF=v0.1.2
