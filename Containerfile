@@ -7,9 +7,7 @@ RUN dnf install -y \
     tpm2-tss-devel \
     perl-core \
     cmake \
-    clang \
-    tdx-attest-devel \
-    sgx-devel
+    clang
 
 
 ## Install Rust toolchains
