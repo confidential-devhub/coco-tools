@@ -1,0 +1,104 @@
+diff --git a/tools/PcsClientTool/pcsclient.py b/tools/PcsClientTool/pcsclient.py
+index 1ccaa6d4..cb0a9b77 100755
+--- a/tools/PcsClientTool/pcsclient.py
++++ b/tools/PcsClientTool/pcsclient.py
+@@ -68,0 +69,8 @@ class Utils:
++    @staticmethod
++    def parse_json_response(data, response_name):
++        try:
++            return json.loads(data)
++        except json.JSONDecodeError as error:
++            print(f"Failed to parse {response_name} response as JSON: {error}")
++            return None
++
+@@ -348 +356,4 @@ class CollateralFetcher:
+-                tcbinfoJson[tcbinfo_key] = json.loads(sgx_tcbinfo[0])
++                sgx_tcbinfo_json = Utils.parse_json_response(sgx_tcbinfo[0], "SGX TCB info")
++                if sgx_tcbinfo_json is None:
++                    return False
++                tcbinfoJson[tcbinfo_key] = sgx_tcbinfo_json
+@@ -355 +366,4 @@ class CollateralFetcher:
+-                        tcbinfoJson[tdx_tcbinfo_key] = json.loads(tdx_tcbinfo[0])
++                        tdx_tcbinfo_json = Utils.parse_json_response(tdx_tcbinfo[0], "TDX TCB info")
++                        if tdx_tcbinfo_json is None:
++                            return False
++                        tcbinfoJson[tdx_tcbinfo_key] = tdx_tcbinfo_json
+@@ -373 +387,4 @@ class CollateralFetcher:
+-                self.output_json["collaterals"][f"{identity_type}identity{key_suffix}"] = identity[0]
++                identity_json = Utils.parse_json_response(identity[0], f"{identity_type.upper()} identity")
++                if identity_json is None:
++                    return False
++                self.output_json["collaterals"][f"{identity_type}identity{key_suffix}"] = identity_json
+@@ -459 +476,4 @@ class CacheCreator:
+-        tcbcomponent = self._decompose_cpusvn_components(platform["cpu_svn"], json.loads(sgx_tcbinfo[0])["tcbInfo"]["tcbType"])
++        sgx_tcbinfo_json = Utils.parse_json_response(sgx_tcbinfo[0], "SGX TCB info")
++        if sgx_tcbinfo_json is None:
++            return False
++        tcbcomponent = self._decompose_cpusvn_components(platform["cpu_svn"], sgx_tcbinfo_json["tcbInfo"]["tcbType"])
+diff --git a/tools/PcsClientTool/tests/test_pcsclient.py b/tools/PcsClientTool/tests/test_pcsclient.py
+index b8c17e01..36de64bc 100644
+--- a/tools/PcsClientTool/tests/test_pcsclient.py
++++ b/tools/PcsClientTool/tests/test_pcsclient.py
+@@ -11,2 +11,2 @@ import unittest
+-from unittest.mock import patch
+-from pcsclient import Utils
++from unittest.mock import Mock, patch
++from pcsclient import CollateralFetcher, Utils
+@@ -15,0 +16,10 @@ class TestUtils(unittest.TestCase):
++    def test_parse_json_response_reports_invalid_json(self):
++        with patch("builtins.print") as mock_print:
++            result = Utils.parse_json_response("Service unavailable", "QE identity")
++
++        self.assertIsNone(result)
++        self.assertIn(
++            "Failed to parse QE identity response as JSON",
++            mock_print.call_args.args[0],
++        )
++
+@@ -88,0 +99,46 @@ class TestUtils(unittest.TestCase):
++class TestCollateralFetcher(unittest.TestCase):
++    def test_fetch_identity_stores_valid_json(self):
++        fetcher = CollateralFetcher.__new__(CollateralFetcher)
++        fetcher.tcb_update_type = "standard"
++        fetcher.pcsclient = Mock()
++        fetcher.pcsclient.get_enclave_identity.return_value = (
++            '{"enclaveIdentity": {"id": "QE"}}',
++            "issuer chain",
++        )
++        fetcher.output_json = {
++            "collaterals": {
++                "qeidentity": "",
++                "certificates": {},
++            }
++        }
++
++        result = fetcher._fetch_identity("qe")
++
++        self.assertTrue(result)
++        self.assertEqual(
++            fetcher.output_json["collaterals"]["qeidentity"],
++            {"enclaveIdentity": {"id": "QE"}},
++        )
++
++    def test_fetch_identity_returns_false_for_invalid_json(self):
++        fetcher = CollateralFetcher.__new__(CollateralFetcher)
++        fetcher.tcb_update_type = "standard"
++        fetcher.pcsclient = Mock()
++        fetcher.pcsclient.get_enclave_identity.return_value = (
++            "Service unavailable",
++            "issuer chain",
++        )
++        fetcher.output_json = {
++            "collaterals": {
++                "qeidentity": "",
++                "certificates": {},
++            }
++        }
++
++        with patch("builtins.print"):
++            result = fetcher._fetch_identity("qe")
++
++        self.assertFalse(result)
++        self.assertEqual(fetcher.output_json["collaterals"]["qeidentity"], "")
++
++

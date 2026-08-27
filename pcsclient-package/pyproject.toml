@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pcsclient"
+version = "0.1.0"
+description = "Client tool for Intel Provisioning Certification Service"
+readme = { file = "README.txt", content-type = "text/plain" }
+requires-python = ">=3.9"
+license = { text = "BSD-3-Clause" }
+dependencies = [
+    "asn1>=2.4.1",
+    "cryptography>=41.0.7",
+    "keyring>=23.0.0",
+    "packaging>=14.0",
+    "pyOpenSSL>=23.2.0",
+    "pypac>=0.14.0",
+    "requests>=2.31.0",
+    "urllib3>=1.26.18",
+]
+
+[project.scripts]
+pcsclient = "pcsclient:main"
+
+[tool.setuptools]
+py-modules = ["pcsclient"]
+
+[tool.setuptools.packages.find]
+include = ["lib", "lib.*"]
