@@ -4,7 +4,10 @@ Container image with confidential containers (CoCo) related tools.
 
 ## Build
 
+Source trees come from git submodules, so fetch them first:
+
 ```sh
+git submodule update --init --recursive
 export image=quay.io/<user>/coco-tools
 podman build -t $image -f Containerfile .
 ```

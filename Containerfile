@@ -10,95 +10,69 @@ RUN dnf install -y \
     clang
 
 
-## Install Rust toolchains
-# COCO_RUST_VERSION: used as the default; matches guest-components and trustee
-#   rust-toolchain.toml, and satisfies snpguest (MSRV 1.86) and snphost (MSRV 1.85)
-# KATA_RUST_VERSION: pre-installed for genpolicy; kata's rust-toolchain.toml
-#   auto-selects it when cargo runs inside the kata source tree
+## Install Rust toolchain
+# COCO_RUST_VERSION: default toolchain, used by snpguest (MSRV 1.86), snphost
+#   (MSRV 1.85) and tdx-measure, which do not pin one. guest-components,
+#   trustee and kata-containers ship a rust-toolchain.toml and rustup installs
+#   the pinned toolchain automatically when cargo runs inside their trees.
 ARG COCO_RUST_VERSION=1.90.0
 ENV COCO_RUST_VERSION=${COCO_RUST_VERSION}
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain ${COCO_RUST_VERSION}
 ENV PATH=$PATH:/root/.cargo/bin
 
-ARG KATA_RUST_VERSION=1.91.0
-ENV KATA_RUST_VERSION=${KATA_RUST_VERSION}
-RUN rustup toolchain install ${KATA_RUST_VERSION}
-
 # Directory to keep all the tools
 RUN mkdir /tools
+
+# Copy source trees from submodules instead of cloning, so this image uses
+# the same downstream sources as Containerfile.ubi
+COPY snpguest /workdir/snpguest
+COPY snphost /workdir/snphost
+COPY guest-components /workdir/guest-components
+COPY trustee /workdir/trustee
+COPY kata-containers /workdir/kata-containers
+COPY tdx-measure /workdir/tdx-measure
 
 # Build different binaries
 
 # Build snpguest
-ARG SNPGUEST_REF=v0.10.0
-ENV SNPGUEST_REF=${SNPGUEST_REF}
-
-RUN git clone --single-branch --branch ${SNPGUEST_REF} https://github.com/virtee/snpguest.git
-RUN cd /snpguest/ && \
-    cargo build -r
-# Copy snpguest
-RUN cp /snpguest/target/release/snpguest /tools/snpguest
+WORKDIR /workdir/snpguest
+RUN cargo build -r
+RUN cp target/release/snpguest /tools/snpguest
 
 # Build snphost
-ARG SNPHOST_REF=v0.7.0
-ENV SNPHOST_REF=${SNPHOST_REF}
-
-RUN git clone --single-branch --branch ${SNPHOST_REF} https://github.com/virtee/snphost.git
-RUN cd /snphost/ && \
-    cargo build -r
-# Copy snphost
-RUN cp /snphost/target/release/snphost /tools/snphost
-
+WORKDIR /workdir/snphost
+RUN cargo build -r
+RUN cp target/release/snphost /tools/snphost
 
 # Build trustee-attester
-ARG GUEST_COMPONENTS_REF=v0.17.0
-ENV GUEST_COMPONENTS_REF=${GUEST_COMPONENTS_REF}
-RUN git clone --single-branch --branch ${GUEST_COMPONENTS_REF} https://github.com/confidential-containers/guest-components.git
-RUN cd /guest-components/attestation-agent/kbs_protocol/ && \
-    cargo build -p kbs_protocol --bin trustee-attester --locked --release --no-default-features --features background_check,passport,openssl,all-attesters,bin
-# Copy trustee-attester
-RUN cp /guest-components/target/release/trustee-attester /tools/trustee-attester
+WORKDIR /workdir/guest-components/attestation-agent/kbs_protocol
+RUN cargo build -p kbs_protocol --bin trustee-attester --locked --release --no-default-features --features background_check,passport,openssl,all-attesters,bin
+RUN cp /workdir/guest-components/target/release/trustee-attester /tools/trustee-attester
 
 # oneshot CDH
-RUN cd /guest-components/confidential-data-hub/hub && \
-    cargo build --release --no-default-features --features "bin,ttrpc,kbs,sev" --bin ttrpc-cdh
-# Copy oneshot CDH
-RUN cp /guest-components/target/release/ttrpc-cdh /tools/ttrpc-cdh
+WORKDIR /workdir/guest-components/confidential-data-hub/hub
+RUN cargo build --release --no-default-features --features "bin,ttrpc,kbs,sev" --bin ttrpc-cdh
+RUN cp /workdir/guest-components/target/release/ttrpc-cdh /tools/ttrpc-cdh
 
 # sealed secret client
-RUN cd /guest-components/confidential-data-hub/hub && \
-    cargo build --release --no-default-features --features "bin,cli" --bin secret
-# Copy sealed secret client
-RUN cp /guest-components/target/release/secret /tools/secret
-
+WORKDIR /workdir/guest-components/confidential-data-hub/hub
+RUN cargo build --release --no-default-features --features "bin,cli" --bin secret
+RUN cp /workdir/guest-components/target/release/secret /tools/secret
 
 # Build kbs-client
-ARG TRUSTEE_REF=v0.17.0
-ENV TRUSTEE_REF=${TRUSTEE_REF}
+WORKDIR /workdir/trustee/tools/kbs-client
+RUN cargo build -p kbs-client --locked --release --no-default-features --features "all-attesters"
+RUN cp /workdir/trustee/target/release/kbs-client /tools/kbs-client
 
-RUN git clone --single-branch --branch ${TRUSTEE_REF} https://github.com/confidential-containers/trustee.git
-RUN cd /trustee/tools/kbs-client/ && \
-    cargo build -p kbs-client --locked --release --no-default-features --features "all-attesters"
-# Copy kbs-client
-RUN cp /trustee/target/release/kbs-client /tools/kbs-client
-
-
-# genpolicy — kata's rust-toolchain.toml (channel = "1.91") auto-selects the
-# pre-installed KATA_RUST_VERSION toolchain when cargo is invoked by make
-ARG KATA_REF=3.25.0
-ENV KATA_REF=${KATA_REF}
-RUN git clone --single-branch --branch ${KATA_REF} https://github.com/kata-containers/kata-containers.git
-RUN cd /kata-containers/src/tools/genpolicy && make LIBC=gnu
-# Copy genpolicy
-RUN cp /kata-containers/src/tools/genpolicy/target/$(uname -m)-unknown-linux-gnu/release/genpolicy /tools/genpolicy
+# genpolicy
+WORKDIR /workdir/kata-containers/src/tools/genpolicy
+RUN make LIBC=gnu
+RUN cp /workdir/kata-containers/src/tools/genpolicy/target/$(uname -m)-unknown-linux-gnu/release/genpolicy /tools/genpolicy
 
 # Build tdx-measure (used by veritas for TDX RTMR computation)
-ARG TDX_MEASURE_REF=main
-ENV TDX_MEASURE_REF=${TDX_MEASURE_REF}
-RUN git clone --single-branch --branch ${TDX_MEASURE_REF} https://github.com/virtee/tdx-measure.git
-RUN cd /tdx-measure/cli && \
-    cargo build -r
-RUN cp /tdx-measure/cli/target/release/tdx-measure /tools/tdx-measure
+WORKDIR /workdir/tdx-measure/cli
+RUN cargo build -r
+RUN cp target/release/tdx-measure /tools/tdx-measure
 
 FROM quay.io/fedora/fedora:44 AS tools-container
 
