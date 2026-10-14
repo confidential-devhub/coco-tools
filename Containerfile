@@ -46,12 +46,13 @@ RUN cp target/release/snphost /tools/snphost
 
 # Build trustee-attester
 WORKDIR /workdir/guest-components/attestation-agent/kbs_protocol
-RUN cargo build -p kbs_protocol --bin trustee-attester --locked --release --no-default-features --features background_check,passport,openssl,all-attesters,bin
+# all-attesters minus nvidia-attester, which needs the NVIDIA attestation C++ SDK (libnvat)
+RUN cargo build -p kbs_protocol --bin trustee-attester --locked --release --no-default-features --features background_check,passport,openssl,tdx-attester,sgx-attester,az-snp-vtpm-attester,az-tdx-vtpm-attester,snp-attester,csv-attester,hygon-dcu-attester,cca-attester,se-attester,tpm-attester,nvidia-dpu-attester,bin
 RUN cp /workdir/guest-components/target/release/trustee-attester /tools/trustee-attester
 
 # oneshot CDH
 WORKDIR /workdir/guest-components/confidential-data-hub/hub
-RUN cargo build --release --no-default-features --features "bin,ttrpc,kbs,sev" --bin ttrpc-cdh
+RUN cargo build --release --no-default-features --features "bin,ttrpc,kbs" --bin ttrpc-cdh
 RUN cp /workdir/guest-components/target/release/ttrpc-cdh /tools/ttrpc-cdh
 
 # sealed secret client
@@ -61,7 +62,7 @@ RUN cp /workdir/guest-components/target/release/secret /tools/secret
 
 # Build kbs-client
 WORKDIR /workdir/trustee/tools/kbs-client
-RUN cargo build -p kbs-client --locked --release --no-default-features --features "all-attesters"
+RUN cargo build -p kbs-client --locked --release --features "all-attesters"
 RUN cp /workdir/trustee/target/release/kbs-client /tools/kbs-client
 
 # genpolicy
