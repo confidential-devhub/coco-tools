@@ -68,7 +68,7 @@ RUN cp /workdir/trustee/target/release/kbs-client /tools/kbs-client
 # genpolicy
 WORKDIR /workdir/kata-containers/src/tools/genpolicy
 RUN make LIBC=gnu
-RUN cp /workdir/kata-containers/src/tools/genpolicy/target/$(uname -m)-unknown-linux-gnu/release/genpolicy /tools/genpolicy
+RUN cp /workdir/kata-containers/target/$(uname -m)-unknown-linux-gnu/release/genpolicy /tools/genpolicy
 
 # Build tdx-measure (used by veritas for TDX RTMR computation)
 WORKDIR /workdir/tdx-measure/cli
