@@ -148,10 +148,10 @@ RUN curl -sL \
     pip install --no-cache-dir tools/PcsClientTool
 
 # Install veritas with SNP and TDX support.
-# Base install covers TDX (uses tdx-measure binary); [snp] extra adds sev-snp-measure for SNP
-ARG VERITAS_REF=v0.1.2
-RUN pip install --no-cache-dir \
-    "veritas[snp] @ git+https://github.com/confidential-devhub/veritas.git@${VERITAS_REF}"
+# Base install covers TDX (uses tdx-measure binary); [snp] extra adds sev-snp-measure for SNP.
+# Pinned in requirements.txt, the single source of truth (also the hermeto pip input).
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 COPY --from=build-container /tools /tools
 ENV PATH="/tools:${PATH}"
