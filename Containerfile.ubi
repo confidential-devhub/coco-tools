@@ -65,12 +65,13 @@ RUN cp target/release/snphost /tools/snphost
 
 # Build trustee-attester
 WORKDIR /workdir/guest-components/attestation-agent/kbs_protocol
-RUN cargo build -p kbs_protocol --bin trustee-attester --locked --release --no-default-features --features background_check,passport,openssl,all-attesters,bin
+# all-attesters minus nvidia-attester, which needs the NVIDIA attestation C++ SDK (libnvat)
+RUN cargo build -p kbs_protocol --bin trustee-attester --locked --release --no-default-features --features background_check,passport,openssl,tdx-attester,sgx-attester,az-snp-vtpm-attester,az-tdx-vtpm-attester,snp-attester,csv-attester,hygon-dcu-attester,cca-attester,se-attester,tpm-attester,nvidia-dpu-attester,bin
 RUN cp /workdir/guest-components/target/release/trustee-attester /tools/trustee-attester
 
 # oneshot CDH
 WORKDIR /workdir/guest-components/confidential-data-hub/hub
-RUN cargo build --release --no-default-features --features "bin,ttrpc,kbs,sev" --bin ttrpc-cdh
+RUN cargo build --release --no-default-features --features "bin,ttrpc,kbs" --bin ttrpc-cdh
 RUN cp /workdir/guest-components/target/release/ttrpc-cdh /tools/ttrpc-cdh
 
 # sealed secret client
@@ -147,10 +148,10 @@ RUN curl -sL \
     pip install --no-cache-dir tools/PcsClientTool
 
 # Install veritas with SNP and TDX support.
-# Base install covers TDX (uses tdx-measure binary); [snp] extra adds sev-snp-measure for SNP
-ARG VERITAS_REF=v0.1.2
-RUN pip install --no-cache-dir \
-    "veritas[snp] @ git+https://github.com/confidential-devhub/veritas.git@${VERITAS_REF}"
+# Base install covers TDX (uses tdx-measure binary); [snp] extra adds sev-snp-measure for SNP.
+# Pinned in requirements.txt, the single source of truth (also the hermeto pip input).
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 COPY --from=build-container /tools /tools
 ENV PATH="/tools:${PATH}"
